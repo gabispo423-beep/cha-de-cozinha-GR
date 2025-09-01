@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin - Chá de Cozinha (Gerenciar Presentes)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;background:#f7f7fb;color:#0b1220;padding:20px}
+    h1{color:#e91e63}
+    .box{background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(15,23,42,.06);max-width:800px;margin:12px auto}
+    input,textarea,button{font-size:15px;padding:8px;border-radius:6px;border:1px solid #d1d5db}
+    textarea{width:100%;height:110px;resize:vertical}
+    .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+    ul{list-style:none;padding:0}
+    li{background:#fff;margin:6px 0;padding:8px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;border:1px solid #eef2f7}
+    .btn{background:#e91e63;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
+    .btn.secondary{background:#2563eb}
+    .small{padding:6px 10px;font-size:14px}
+    .sorteado{background:#fff0f6;text-decoration:line-through}
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Painel do Organizador</h1>
+
+    <div id="loginArea">
+      <p><strong>Login do Admin</strong></p>
+      <input id="email" placeholder="E-mail do admin" />
+      <input id="senha" type="password" placeholder="Senha" style="margin-left:8px" />
+      <div class="row">
+        <button id="btnLogin" class="btn small">Entrar</button>
+        <span style="margin-left:12px;color:#374151">Use o e-mail criado em Authentication (Firebase Console).</span>
+      </div>
+    </div>
+
+    <div id="adminArea" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <button id="btnSair" class="small">Sair</button>
+        </div>
+        <div>
+          <button id="btnLimparSorteados" class="small">Limpar histórico (sorteados)</button>
+        </div>
+      </div>
+
+      <h3 style="margin-top:12px">Adicionar um presente</h3>
+      <div class="row">
+        <input id="novoItem" placeholder="Nome do presente" style="flex:1" />
+        <button id="btnAdd" class="btn small">Adicionar</button>
+      </div>
+
+      <h3 style="margin-top:16px">Adicionar vários (um por linha)</h3>
+      <textarea id="bulkArea" placeholder="Ex: Ferro de passar&#10;Conjunto de panelas"></textarea>
+      <div class="row">
+        <button id="btnBulk" class="btn small">Adicionar todos</button>
+      </div>
+
+      <h3 style="margin-top:16px">Presentes disponíveis</h3>
+      <ul id="listaAtuais"></ul>
+
+      <h3 style="margin-top:16px">Presentes já sorteados (histórico)</h3>
+      <ul id="listaSorteados"></ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import {
+      getFirestore, doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove
+    } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+    import {
+      getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+
+    // --------- firebaseConfig (SEU CONFIG já inserido) ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyCZzmLT9o2iB2hLxC_K9q2DyDhkaBG1qH4",
+      authDomain: "cha-de-cozinha-40ac5.firebaseapp.com",
+      projectId: "cha-de-cozinha-40ac5",
+      storageBucket: "cha-de-cozinha-40ac5.firebasestorage.app",
+      messagingSenderId: "120302780416",
+      appId: "1:120302780416:web:383bcc8fc56f999eb598e5",
+      measurementId: "G-BREPECZX2M"
+    };
+    // -----------------------------------------------------------
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    const docRef = doc(db, "cha", "presentes");
+
+    // Elementos
+    const loginArea = document.getElementById("loginArea");
+    const adminArea = document.getElementById("adminArea");
+    const btnLogin = document.getElementById("btnLogin");
+    const btnSair = document.getElementById("btnSair");
+    const btnAdd = document.getElementById("btnAdd");
+    const novoItem = document.getElementById("novoItem");
+    const listaAtuais = document.getElementById("listaAtuais");
+    const listaSorteados = document.getElementById("listaSorteados");
+    const btnBulk = document.getElementById("btnBulk");
+    const bulkArea = document.getElementById("bulkArea");
+    const btnLimparSorteados = document.getElementById("btnLimparSorteados");
+
+    btnLogin.onclick = async () => {
+      const email = document.getElementById("email").value.trim();
+      const senha = document.getElementById("senha").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, senha);
+      } catch (e) {
+        alert("Erro ao entrar: " + e.message);
+      }
+    };
+
+    btnSair.onclick = async () => {
+      await signOut(auth);
+    };
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        loginArea.style.display = "none";
+        adminArea.style.display = "block";
+      } else {
+        loginArea.style.display = "block";
+        adminArea.style.display = "none";
+      }
+    });
+
+    // Snapshot em tempo real do documento 'cha/presentes'
+    onSnapshot(docRef, snap => {
+      const data = snap.exists() ? snap.data() : { lista: [], sorteados: [] };
+      const lista = data.lista || [];
+      const sorteados = data.sorteados || [];
+
+      // lista atuais
+      listaAtuais.innerHTML = "";
+      lista.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        const controls = document.createElement("div");
+        controls.style.display = "flex"; controls.style.gap = "8px";
+        // remover (sem colocar em sorteados)
+        const rm = document.createElement("button");
+        rm.className = "small";
+        rm.textContent = "Remover";
+        rm.onclick = async () => {
+          if (!confirm('Remover "'+item+'"?')) return;
+          await updateDoc(docRef, { lista: arrayRemove(item) });
+        };
+        // marcar como sorteado (manualmente) => move para sorteados
+        const mark = document.createElement("button");
+        mark.className = "small";
+        mark.textContent = "Marcar como sorteado";
+        mark.onclick = async () => {
+          if (!confirm('Marcar "'+item+'" como sorteado?')) return;
+          // remove da lista e adiciona a sorteados (não atomically aqui — simplifica)
+          await updateDoc(docRef, { lista: arrayRemove(item), sorteados: arrayUnion(item) });
+        };
+
+        controls.appendChild(rm);
+        controls.appendChild(mark);
+        li.appendChild(controls);
+        listaAtuais.appendChild(li);
+      });
+
+      // sorteados
+      listaSorteados.innerHTML = "";
+      sorteados.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        li.className = "sorteado";
+        listaSorteados.appendChild(li);
+      });
+    });
+
+    // Adicionar item (usando arrayUnion — cria doc se não existir)
+    btnAdd.onclick = async () => {
+      const v = novoItem.value.trim();
+      if (!v) return alert("Digite um presente");
+      try {
+        // tenta update, se documento não existir, faz set inicial
+        try {
+          await updateDoc(docRef, { lista: arrayUnion(v) });
+        } catch (err) {
+          await setDoc(docRef, { lista: [v], sorteados: [] });
+        }
+        novoItem.value = "";
+      } catch(e){ alert("Erro: "+e.message); }
+    };
+
+    // Bulk add
+    btnBulk.onclick = async () => {
+      const lines = bulkArea.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      if (lines.length === 0) return alert("Digite pelo menos um item");
+      try {
+        try {
+          // adicionar cada um com arrayUnion (pode ser batelada)
+          for (const it of lines) await updateDoc(docRef, { lista: arrayUnion(it) });
+        } catch (err) {
+          // se doc não existe, criar com lista inteira
+          await setDoc(docRef, { lista: lines, sorteados: [] });
+        }
+        bulkArea.value = "";
+      } catch(e){ alert("Erro: "+e.message); }
+    };
+
+    // Limpar histórico de sorteados (apenas admin)
+    btnLimparSorteados.onclick = async () => {
+      if (!confirm("Limpar o histórico de sorteados?")) return;
+      await updateDoc(docRef, { sorteados: [] });
+    };
+
+  </script>
+</body>
+</html>

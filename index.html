@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Roleta de Presentes - Chá de Cozinha</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to bottom, #fff0f5, #ffe4e1);
+      color: #333;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #d6336c;
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    #canvasWrap {
+      display: inline-block;
+      position: relative;
+    }
+    #pointer {
+      position: absolute;
+      left: 50%;
+      top: -20px;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-bottom: 36px solid #d6336c;
+      z-index: 3;
+    }
+    canvas {
+      border-radius: 50%;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+      background: #fff;
+    }
+    button {
+      margin-top: 20px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: none;
+      background: #d6336c;
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    #resultado {
+      margin-top: 20px;
+      font-size: 20px;
+      font-weight: 700;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎁 Roleta de Presentes</h1>
+  <div id="canvasWrap">
+    <div id="pointer"></div>
+    <canvas id="wheel" width="420" height="420"></canvas>
+  </div>
+  <br>
+  <button id="btnGirar">Girar a roleta</button>
+  <div id="resultado"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getFirestore, doc, runTransaction, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCZzmLT9o2iB2hLxC_K9q2DyDhkaBG1qH4",
+      authDomain: "cha-de-cozinha-40ac5.firebaseapp.com",
+      projectId: "cha-de-cozinha-40ac5",
+      storageBucket: "cha-de-cozinha-40ac5.firebasestorage.app",
+      messagingSenderId: "120302780416",
+      appId: "1:120302780416:web:383bcc8fc56f999eb598e5",
+      measurementId: "G-BREPECZX2M"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const docRef = doc(db, "cha", "presentes");
+
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const btnGirar = document.getElementById("btnGirar");
+    const resultadoEl = document.getElementById("resultado");
+
+    let itens = [];
+    let anguloG = 0;
+    let girado = false;
+
+    async function carregarItens() {
+      const snap = await getDoc(docRef);
+      const data = snap.exists() ? snap.data() : { lista: [], sorteados: [] };
+      itens = data.lista || [];
+      desenhar(itens);
+    }
+
+    function desenhar(lista) {
+      const total = lista.length;
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const raio = Math.min(cx, cy) - 6;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (total === 0) {
+        ctx.beginPath(); ctx.arc(cx, cy, raio, 0, Math.PI * 2); ctx.fillStyle = "#efefef"; ctx.fill();
+        ctx.fillStyle = "#666"; ctx.font = "20px Arial"; ctx.textAlign = "center"; ctx.fillText("Sem itens", cx, cy + 6);
+        return;
+      }
+
+      const ang = 2 * Math.PI / total;
+      for (let i = 0; i < total; i++) {
+        const start = i * ang;
+        const end = (i + 1) * ang;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, raio, start, end);
+        ctx.closePath();
+        ctx.fillStyle = i % 2 ? "#f8bbd0" : "#f48fb1";
+        ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.stroke();
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(start + ang / 2);
+        ctx.fillStyle = "#222";
+        ctx.font = "16px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(lista[i], raio * 0.6, 6);
+        ctx.restore();
+      }
+    }
+
+    async function escolherAtomico() {
+      return await runTransaction(db, async (t) => {
+        const s = await t.get(docRef);
+        if (!s.exists()) throw new Error("Documento não existe");
+        const lista = s.data().lista || [];
+        if (lista.length === 0) throw new Error("empty");
+        const idx = Math.floor(Math.random() * lista.length);
+        const escolhido = lista[idx];
+        const novaLista = lista.filter((_, i) => i !== idx);
+        const sorteados = (s.data().sorteados || []).concat(escolhido);
+        t.update(docRef, { lista: novaLista, sorteados: sorteados });
+        return { escolhido, idx, lenBefore: lista.length };
+      });
+    }
+
+    function animarEShow({ escolhido, idx, lenBefore }) {
+      const degreesPer = 360 / lenBefore;
+      const centerDeg = idx * degreesPer + degreesPer / 2;
+      const extraDeg = 360 * 5 + (360 - centerDeg);
+
+      canvas.style.transition = "transform 5s ease-out";
+      anguloG = (anguloG + extraDeg) % 360;
+      canvas.style.transform = `rotate(${anguloG}deg)`;
+
+      setTimeout(() => {
+        canvas.style.transition = "";
+        canvas.style.transform = `rotate(${anguloG}deg)`;
+        resultadoEl.textContent = `🎉 Você sorteou: ${escolhido}`;
+        btnGirar.disabled = true;
+      }, 5200);
+    }
+
+    btnGirar.onclick = async () => {
+      if (girado) return;
+      girado = true;
+      btnGirar.disabled = true;
+      resultadoEl.textContent = "Girando...";
+      try {
+        const res = await escolherAtomico();
+        animarEShow(res);
+      } catch (e) {
+        resultadoEl.textContent = "Erro ou lista vazia.";
+        console.error(e);
+      }
+    };
+
+    carregarItens();
+  </script>
+</body>
+</html>
