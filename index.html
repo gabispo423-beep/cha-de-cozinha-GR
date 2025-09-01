@@ -11,6 +11,7 @@
       color: #333;
       padding: 20px;
       text-align: center;
+      margin: 0;
     }
     h1 {
       color: #d6336c;
@@ -20,6 +21,9 @@
     #canvasWrap {
       display: inline-block;
       position: relative;
+      /* Novo: Usar max-width para adaptar a roleta */
+      max-width: 90%;
+      margin: 0 auto;
     }
     #pointer {
       position: absolute;
@@ -37,6 +41,9 @@
       border-radius: 50%;
       box-shadow: 0 10px 30px rgba(0,0,0,.15);
       background: #fff;
+      /* Novo: Tornar a roleta responsiva */
+      width: 100%;
+      height: auto;
     }
     button {
       margin-top: 20px;
