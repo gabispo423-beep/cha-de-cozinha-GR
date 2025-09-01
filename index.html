@@ -2,85 +2,81 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <title>Roleta de Presentes - Chá de Cozinha</title>
+  <title>Admin - Chá de Cozinha (Gerenciar Presentes)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to bottom, #fff0f5, #ffe4e1);
-      color: #333;
-      padding: 20px;
-      text-align: center;
-      margin: 0;
+    body{font-family:'Segoe UI',sans-serif;background:#f7f7fb;color:#0b1220;padding:20px}
+    h1{color:#e91e63}
+    .box{background:#fff;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(15,23,42,.06);max-width:800px;margin:12px auto}
+    .box h2 { color: #d6336c; font-size: 20px; margin-top: 0; }
+    input,textarea,button{font-size:15px;padding:8px;border-radius:6px;border:1px solid #d1d5db}
+    input { width: calc(50% - 4px); }
+    textarea{width:100%;height:110px;resize:vertical}
+    .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+    ul{list-style:none;padding:0}
+    li{background:#fff;margin:6px 0;padding:8px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;border:1px solid #eef2f7}
+    .btn{background:#e91e63;color:#fff;border:none;cursor:pointer;padding:8px;border-radius:6px;font-size:14px;margin-left:auto}
+    .btn-edit, .btn-save{ background-color: #3b82f6; }
+    .btn-remove, .btn-cancel{background:#ef4444}
+    #authDiv button{background:#e91e63;color:white;border:none;padding:10px 15px;border-radius:6px;cursor:pointer}
+    .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border-left-color: #e91e63;
+        animation: spin 1s ease infinite;
     }
-    h1 {
-      color: #d6336c;
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-    #canvasWrap {
-      display: inline-block;
-      position: relative;
-      /* Novo: Usar max-width para adaptar a roleta */
-      max-width: 90%;
-      margin: 0 auto;
-    }
-    #pointer {
-      position: absolute;
-      left: 50%;
-      top: -20px;
-      transform: translateX(-50%);
-      width: 0;
-      height: 0;
-      border-left: 18px solid transparent;
-      border-right: 18px solid transparent;
-      border-bottom: 36px solid #d6336c;
-      z-index: 3;
-    }
-    canvas {
-      border-radius: 50%;
-      box-shadow: 0 10px 30px rgba(0,0,0,.15);
-      background: #fff;
-      /* Novo: Tornar a roleta responsiva */
-      width: 100%;
-      height: auto;
-    }
-    button {
-      margin-top: 20px;
-      padding: 12px 24px;
-      border-radius: 10px;
-      border: none;
-      background: #d6336c;
-      color: white;
-      font-weight: bold;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:disabled {
-      background: #aaa;
-      cursor: not-allowed;
-    }
-    #resultado {
-      margin-top: 20px;
-      font-size: 20px;
-      font-weight: 700;
-      color: #333;
-    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <h1>🎁 Roleta de Presentes</h1>
-  <div id="canvasWrap">
-    <div id="pointer"></div>
-    <canvas id="wheel" width="420" height="420"></canvas>
+  <div id="authDiv">
+    <h1>Login de Administrador</h1>
+    <p>Para gerenciar os presentes, faça login com uma conta do Firebase Auth.</p>
+    <div class="row">
+      <input type="email" id="emailInput" placeholder="Email" />
+      <input type="password" id="passwordInput" placeholder="Senha" />
+      <button id="btnLogin">Entrar</button>
+      <button id="btnLogout" style="display:none;">Sair</button>
+    </div>
   </div>
-  <br>
-  <button id="btnGirar">Girar a roleta</button>
-  <div id="resultado"></div>
+  
+  <div id="adminPanel" style="display:none;">
+    <h1>Admin - Gerenciar Presentes</h1>
+    
+    <div class="box">
+      <h2>Adicionar um item</h2>
+      <div class="row">
+        <input type="text" id="novoItem" placeholder="Nome do presente" />
+        <input type="url" id="novoItemUrl" placeholder="URL da foto" />
+        <button class="btn" id="btnAdd">Adicionar</button>
+      </div>
+    </div>
+    
+    <div class="box">
+      <h2>Adicionar vários itens (separados por linha)</h2>
+      <textarea id="bulkArea" placeholder="Nome do presente, URL da foto (um por linha)&#10;Ex: Liquidificador, https://url.com/liquidificador.jpg"></textarea>
+      <button class="btn" id="btnBulk">Adicionar todos</button>
+    </div>
+    
+    <div class="box">
+      <h2>Lista de Presentes Disponíveis</h2>
+      <div id="loading" class="spinner"></div>
+      <ul id="listaPresentes"></ul>
+    </div>
+    
+    <div class="box">
+      <h2>Presentes Sorteados (Histórico)</h2>
+      <ul id="listaSorteados"></ul>
+      <button class="btn btn-remove" id="btnLimpar">Limpar histórico</button>
+    </div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getFirestore, doc, runTransaction, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCZzmLT9o2iB2hLxC_K9q2DyDhkaBG1qH4",
@@ -91,110 +87,163 @@
       appId: "1:120302780416:web:383bcc8fc56f999eb598e5",
       measurementId: "G-BREPECZX2M"
     };
-
+    
     const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
     const db = getFirestore(app);
     const docRef = doc(db, "cha", "presentes");
 
-    const canvas = document.getElementById("wheel");
-    const ctx = canvas.getContext("2d");
-    const btnGirar = document.getElementById("btnGirar");
-    const resultadoEl = document.getElementById("resultado");
+    const adminPanel = document.getElementById("adminPanel");
+    const authDiv = document.getElementById("authDiv");
+    const emailInput = document.getElementById("emailInput");
+    const passwordInput = document.getElementById("passwordInput");
+    const btnLogin = document.getElementById("btnLogin");
+    const btnLogout = document.getElementById("btnLogout");
+    const novoItem = document.getElementById("novoItem");
+    const novoItemUrl = document.getElementById("novoItemUrl");
+    const btnAdd = document.getElementById("btnAdd");
+    const bulkArea = document.getElementById("bulkArea");
+    const btnBulk = document.getElementById("btnBulk");
+    const listaPresentes = document.getElementById("listaPresentes");
+    const listaSorteados = document.getElementById("listaSorteados");
+    const btnLimpar = document.getElementById("btnLimpar");
+    const loading = document.getElementById("loading");
 
-    let itens = [];
-    let anguloG = 0;
-    let girado = false;
-
-    async function carregarItens() {
-      const snap = await getDoc(docRef);
-      const data = snap.exists() ? snap.data() : { lista: [], sorteados: [] };
-      itens = data.lista || [];
-      desenhar(itens);
-    }
-
-    function desenhar(lista) {
-      const total = lista.length;
-      const cx = canvas.width / 2;
-      const cy = canvas.height / 2;
-      const raio = Math.min(cx, cy) - 6;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (total === 0) {
-        ctx.beginPath(); ctx.arc(cx, cy, raio, 0, Math.PI * 2); ctx.fillStyle = "#efefef"; ctx.fill();
-        ctx.fillStyle = "#666"; ctx.font = "20px Arial"; ctx.textAlign = "center"; ctx.fillText("Sem itens", cx, cy + 6);
-        return;
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        authDiv.style.display = "none";
+        adminPanel.style.display = "block";
+        btnLogout.style.display = "block";
+      } else {
+        authDiv.style.display = "block";
+        adminPanel.style.display = "none";
+        btnLogout.style.display = "none";
       }
+    });
 
-      const ang = 2 * Math.PI / total;
-      for (let i = 0; i < total; i++) {
-        const start = i * ang;
-        const end = (i + 1) * ang;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, raio, start, end);
-        ctx.closePath();
-        ctx.fillStyle = i % 2 ? "#f8bbd0" : "#f48fb1";
-        ctx.fill();
-        ctx.strokeStyle = "#fff"; ctx.stroke();
+    btnLogin.onclick = () => signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(e => alert(e.message));
+    btnLogout.onclick = () => signOut(auth);
 
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(start + ang / 2);
-        ctx.fillStyle = "#222";
-        ctx.font = "16px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(lista[i], raio * 0.6, 6);
-        ctx.restore();
+    onSnapshot(docRef, docSnap => {
+      loading.style.display = "none";
+      const data = docSnap.exists() ? docSnap.data() : { lista: [], sorteados: [] };
+      const lista = data.lista || [];
+      const sorteados = data.sorteados || [];
+      
+      listaPresentes.innerHTML = '';
+      if (lista.length === 0) {
+        listaPresentes.innerHTML = '<li>Nenhum item na lista.</li>';
       }
-    }
+      lista.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="item-name">${item.nome}</span>
+          <div class="edit-inputs" style="display:none;">
+            <input type="text" value="${item.nome}" />
+            <input type="url" value="${item.fotoURL}" />
+          </div>
+          <div class="action-buttons">
+            <button class="btn btn-edit">Editar</button>
+            <button class="btn btn-remove">Remover</button>
+            <button class="btn">Marcar como sorteado</button>
+          </div>
+          <div class="edit-buttons" style="display:none;">
+            <button class="btn btn-save">Salvar</button>
+            <button class="btn btn-cancel">Cancelar</button>
+          </div>
+        `;
+        
+        const actionBtns = li.querySelector('.action-buttons');
+        const editBtns = li.querySelector('.edit-buttons');
+        const itemSpan = li.querySelector('.item-name');
+        const editInputs = li.querySelector('.edit-inputs');
+        const editNomeInput = editInputs.querySelector('input[type="text"]');
+        const editUrlInput = editInputs.querySelector('input[type="url"]');
 
-    async function escolherAtomico() {
-      return await runTransaction(db, async (t) => {
-        const s = await t.get(docRef);
-        if (!s.exists()) throw new Error("Documento não existe");
-        const lista = s.data().lista || [];
-        if (lista.length === 0) throw new Error("empty");
-        const idx = Math.floor(Math.random() * lista.length);
-        const escolhido = lista[idx];
-        const novaLista = lista.filter((_, i) => i !== idx);
-        const sorteados = (s.data().sorteados || []).concat(escolhido);
-        t.update(docRef, { lista: novaLista, sorteados: sorteados });
-        return { escolhido, idx, lenBefore: lista.length };
+        li.querySelector('.btn-edit').onclick = () => {
+          actionBtns.style.display = 'none';
+          editBtns.style.display = 'flex';
+          itemSpan.style.display = 'none';
+          editInputs.style.display = 'flex';
+        };
+
+        li.querySelector('.btn-cancel').onclick = () => {
+          actionBtns.style.display = 'flex';
+          editBtns.style.display = 'none';
+          itemSpan.style.display = 'block';
+          editInputs.style.display = 'none';
+        };
+
+        li.querySelector('.btn-save').onclick = async () => {
+          const nome = editNomeInput.value.trim();
+          const fotoURL = editUrlInput.value.trim();
+          if (!nome || !fotoURL) return alert("Nome e URL não podem ser vazios.");
+          const novoObjeto = { nome, fotoURL };
+          try {
+            await updateDoc(docRef, { lista: arrayRemove(item) });
+            await updateDoc(docRef, { lista: arrayUnion(novoObjeto) });
+          } catch(e){ alert("Erro ao salvar: "+e.message); }
+        };
+
+        li.querySelector('.btn-remove').onclick = async () => await updateDoc(docRef, { lista: arrayRemove(item) });
+        li.querySelector('.btn').onclick = async () => await updateDoc(docRef, { lista: arrayRemove(item), sorteados: arrayUnion(item.nome) });
+        
+        listaPresentes.appendChild(li);
       });
-    }
-
-    function animarEShow({ escolhido, idx, lenBefore }) {
-      const degreesPer = 360 / lenBefore;
-      const centerDeg = idx * degreesPer + degreesPer / 2;
-      const extraDeg = 360 * 5 + (360 - centerDeg);
-
-      canvas.style.transition = "transform 5s ease-out";
-      anguloG = (anguloG + extraDeg) % 360;
-      canvas.style.transform = `rotate(${anguloG}deg)`;
-
-      setTimeout(() => {
-        canvas.style.transition = "";
-        canvas.style.transform = `rotate(${anguloG}deg)`;
-        resultadoEl.textContent = `🎉 Você sorteou: ${escolhido}`;
-        btnGirar.disabled = true;
-      }, 5200);
-    }
-
-    btnGirar.onclick = async () => {
-      if (girado) return;
-      girado = true;
-      btnGirar.disabled = true;
-      resultadoEl.textContent = "Girando...";
-      try {
-        const res = await escolherAtomico();
-        animarEShow(res);
-      } catch (e) {
-        resultadoEl.textContent = "Erro ou lista vazia.";
-        console.error(e);
+      
+      listaSorteados.innerHTML = '';
+      if (sorteados.length === 0) {
+        listaSorteados.innerHTML = '<li>Nenhum item sorteado ainda.</li>';
       }
+      sorteados.forEach(nome => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${nome}</span>`;
+        listaSorteados.appendChild(li);
+      });
+    });
+
+    btnAdd.onclick = async () => {
+      const nome = novoItem.value.trim();
+      const fotoURL = novoItemUrl.value.trim();
+      if (!nome) return alert("Digite o nome do presente.");
+      if (!fotoURL) return alert("Digite a URL da foto.");
+      const novoObjeto = { nome, fotoURL };
+      try {
+        try {
+          await updateDoc(docRef, { lista: arrayUnion(novoObjeto) });
+        } catch (err) {
+          await setDoc(docRef, { lista: [novoObjeto], sorteados: [] });
+        }
+        novoItem.value = "";
+        novoItemUrl.value = "";
+      } catch(e){ alert("Erro: "+e.message); }
     };
 
-    carregarItens();
+    btnBulk.onclick = async () => {
+      const lines = bulkArea.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      if (lines.length === 0) return alert("Digite pelo menos um item.");
+      const novosItens = lines.map(line => {
+        const [nome, fotoURL] = line.split(',').map(s=>s.trim());
+        if (!nome || !fotoURL) throw new Error("Formato inválido: 'Nome do item, URL da foto'.");
+        return { nome, fotoURL };
+      });
+      
+      try {
+        try {
+          await updateDoc(docRef, { lista: arrayUnion(...novosItens) });
+        } catch (err) {
+          await setDoc(docRef, { lista: novosItens, sorteados: [] });
+        }
+        bulkArea.value = "";
+      } catch(e){ alert("Erro: " + e.message); }
+    };
+
+    btnLimpar.onclick = async () => {
+      if (!confirm("Tem certeza que deseja limpar todo o histórico de sorteios?")) return;
+      try {
+        await updateDoc(docRef, { sorteados: [] });
+      } catch(e){ alert("Erro: "+e.message); }
+    };
   </script>
 </body>
 </html>
