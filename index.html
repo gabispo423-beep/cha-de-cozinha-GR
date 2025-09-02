@@ -62,3 +62,124 @@
       flex-direction: column;
       align-items: center;
       text-align: center;
+    }
+    #resultado img {
+      margin-top: 15px;
+      max-width: 80%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+      transition: transform 0.3s ease-in-out;
+    }
+    #resultado img:hover {
+      transform: scale(1.05);
+    }
+    .item-name {
+        font-family: 'Playfair Display', serif; /* Aplicando a fonte ao nome do item */
+        font-size: 2.5em;
+        margin-top: 20px;
+        font-weight: bold;
+        color: #556B2F; /* Verde oliva escuro */
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    .instrucoes {
+        margin-top: 20px;
+        font-size: 1em; /* Levemente maior */
+        color: #6B7A4C; /* Verde oliva mais escuro para o texto */
+        max-width: 80%;
+        line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="initials">G&R</div>
+  <h1>Sorteio de Presentes</h1>
+  <button id="btnSortear">Sortear um presente</button>
+  <div id="resultado"></div>
+  
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getFirestore, doc, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    // ----- Configuração do Firebase -----
+    const firebaseConfig = {
+      apiKey: "AIzaSyCZzmLT9o2iB2hLxC_K9q2DyDhkaBG1qH4",
+      authDomain: "cha-de-cozinha-40ac5.firebaseapp.com",
+      projectId: "cha-de-cozinha-40ac5",
+      storageBucket: "cha-de-cozinha-40ac5.firebasestorage.app",
+      messagingSenderId: "120302780416",
+      appId: "1:120302780416:web:383bcc8fc56f999eb598e5",
+      measurementId: "G-BREPECZX2M"
+    };
+    // ------------------------------------
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const docRef = doc(db, "cha", "presentes");
+
+    const btnSortear = document.getElementById("btnSortear");
+    const resultadoEl = document.getElementById("resultado");
+
+    let sorteiosFeitos = parseInt(localStorage.getItem('sorteiosFeitos')) || 0;
+
+    function atualizarBotao() {
+      if (sorteiosFeitos === 1) {
+        btnSortear.textContent = 'Sortear +1 presente';
+      } else if (sorteiosFeitos >= 2) {
+        btnSortear.disabled = true;
+        btnSortear.textContent = 'Você já sorteou 2 presentes!';
+      } else {
+        btnSortear.textContent = 'Sortear um presente';
+      }
+    }
+
+    // Chama a função para ajustar o botão quando a página carrega
+    atualizarBotao();
+
+    async function sortearItem() {
+      return await runTransaction(db, async (t) => {
+        const s = await t.get(docRef);
+        if (!s.exists()) {
+          throw new Error("Documento não existe");
+        }
+        const lista = s.data().lista || [];
+        if (lista.length === 0) {
+          throw new Error("empty");
+        }
+        const idx = Math.floor(Math.random() * lista.length);
+        const escolhido = lista[idx];
+        
+        const novaLista = lista.filter((_, i) => i !== idx);
+        const sorteados = (s.data().sorteados || []).concat(escolhido.nome);
+        
+        t.update(docRef, { lista: novaLista, sorteados: sorteados });
+        return escolhido;
+      });
+    }
+
+    btnSortear.onclick = async () => {
+      btnSortear.disabled = true;
+      btnSortear.textContent = 'Sorteando...';
+      try {
+        const res = await sortearItem();
+        
+        resultadoEl.innerHTML = `
+          <img src="${res.fotoURL}" alt="${res.nome}" />
+          <span class="item-name">${res.nome}</span>
+          <p class="instrucoes">Caso você não consiga comparecer, por favor, avise alguém próximo da noiva para que este item possa ser sorteado novamente.</p>
+        `;
+        
+        sorteiosFeitos++;
+        localStorage.setItem('sorteiosFeitos', sorteiosFeitos);
+        
+      } catch (e) {
+        resultadoEl.innerHTML = "<span>Erro ou lista vazia.</span>";
+        console.error(e);
+      }
+      
+      btnSortear.disabled = false;
+      atualizarBotao();
+    };
+  </script>
+</body>
+</html>
