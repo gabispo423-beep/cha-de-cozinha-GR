@@ -94,6 +94,16 @@
     const btnSortear = document.getElementById("btnSortear");
     const resultadoEl = document.getElementById("resultado");
 
+    // ----- Novo: Verifica se o usuário já sorteou -----
+    const jaSorteou = localStorage.getItem('jaSorteouPresente');
+
+    if (jaSorteou) {
+      btnSortear.disabled = true;
+      btnSortear.textContent = 'Você já sorteou um presente!';
+      resultadoEl.innerHTML = `<p>Obrigado por participar! Seu presente foi sorteado. A lista de presentes disponíveis está no painel de admin.</p>`;
+    }
+    // ----------------------------------------------------
+
     async function sortearItem() {
       return await runTransaction(db, async (t) => {
         const s = await t.get(docRef);
@@ -117,7 +127,7 @@
 
     btnSortear.onclick = async () => {
       btnSortear.disabled = true;
-      resultadoEl.innerHTML = `<span>Sorteando...</span>`;
+      btnSortear.textContent = 'Sorteando...';
       try {
         const res = await sortearItem();
         
@@ -126,11 +136,17 @@
           <span class="item-name">${res.nome}</span>
         `;
         
+        // ----- Novo: Marca que o usuário já sorteou no navegador -----
+        localStorage.setItem('jaSorteouPresente', 'true');
+        btnSortear.textContent = 'Você já sorteou um presente!';
+        // ----------------------------------------------------------------
+
       } catch (e) {
         resultadoEl.innerHTML = "<span>Erro ou lista vazia.</span>";
         console.error(e);
+        btnSortear.disabled = false;
+        btnSortear.textContent = 'Sortear um presente';
       }
-      btnSortear.disabled = false;
     };
   </script>
 </body>
