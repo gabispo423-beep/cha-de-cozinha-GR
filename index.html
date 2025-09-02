@@ -64,6 +64,12 @@
         color: #d6336c;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
+    .instrucoes {
+        margin-top: 20px;
+        font-size: 0.9em;
+        color: #666;
+        max-width: 80%;
+    }
   </style>
 </head>
 <body>
@@ -93,16 +99,6 @@
 
     const btnSortear = document.getElementById("btnSortear");
     const resultadoEl = document.getElementById("resultado");
-
-    // ----- Novo: Verifica se o usuário já sorteou -----
-    const jaSorteou = localStorage.getItem('jaSorteouPresente');
-
-    if (jaSorteou) {
-      btnSortear.disabled = true;
-      btnSortear.textContent = 'Você já sorteou um presente!';
-      resultadoEl.innerHTML = `<p>Obrigado por participar! Seu presente foi sorteado. A lista de presentes disponíveis está no painel de admin.</p>`;
-    }
-    // ----------------------------------------------------
 
     async function sortearItem() {
       return await runTransaction(db, async (t) => {
@@ -134,19 +130,16 @@
         resultadoEl.innerHTML = `
           <img src="${res.fotoURL}" alt="${res.nome}" />
           <span class="item-name">${res.nome}</span>
+          <p class="instrucoes">Caso você não consiga comparecer, por favor, avise alguém próximo da noiva para que este item possa ser sorteado novamente.</p>
         `;
         
-        // ----- Novo: Marca que o usuário já sorteou no navegador -----
-        localStorage.setItem('jaSorteouPresente', 'true');
-        btnSortear.textContent = 'Você já sorteou um presente!';
-        // ----------------------------------------------------------------
+        btnSortear.textContent = 'Sortear +1 presente';
 
       } catch (e) {
         resultadoEl.innerHTML = "<span>Erro ou lista vazia.</span>";
         console.error(e);
-        btnSortear.disabled = false;
-        btnSortear.textContent = 'Sortear um presente';
       }
+      btnSortear.disabled = false;
     };
   </script>
 </body>
