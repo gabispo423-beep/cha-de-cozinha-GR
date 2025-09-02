@@ -2,12 +2,14 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <title>Sorteio de Presentes - Chá de Cozinha</title>
+  <title>Sorteio de Presentes - Chá de Cozinha G&R</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to bottom, #fff0f5, #ffe4e1);
+      /* Paleta Verde Oliva */
+      background: linear-gradient(to bottom, #F0F5ED, #D4DBCB); /* Tons de verde oliva claro */
       color: #333;
       padding: 20px;
       text-align: center;
@@ -18,24 +20,39 @@
       align-items: center;
       min-height: 100vh;
     }
+    .initials {
+        font-family: 'Playfair Display', serif;
+        font-size: 3.5em; /* Tamanho grande para as iniciais */
+        color: #556B2F; /* Verde oliva escuro */
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
     h1 {
-      color: #d6336c;
-      font-size: 32px;
-      margin-bottom: 10px;
+      font-family: 'Playfair Display', serif; /* Aplicando a fonte ao título */
+      color: #556B2F; /* Verde oliva escuro */
+      font-size: 2.2em; /* Ajuste o tamanho conforme preferir */
+      margin-top: 0;
+      margin-bottom: 20px;
     }
     button {
       padding: 12px 24px;
       border-radius: 10px;
       border: none;
-      background: #d6336c;
+      background: #8B9A67; /* Verde oliva médio */
       color: white;
       font-weight: bold;
       font-size: 16px;
       cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transition: background 0.3s ease;
+    }
+    button:hover {
+        background: #6B7A4C; /* Verde oliva mais escuro no hover */
     }
     button:disabled {
       background: #aaa;
       cursor: not-allowed;
+      box-shadow: none;
     }
     #resultado {
       margin-top: 30px;
@@ -45,121 +62,3 @@
       flex-direction: column;
       align-items: center;
       text-align: center;
-    }
-    #resultado img {
-      margin-top: 15px;
-      max-width: 80%;
-      height: auto;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,.1);
-      transition: transform 0.3s ease-in-out;
-    }
-    #resultado img:hover {
-      transform: scale(1.05);
-    }
-    .item-name {
-        font-size: 2.5em;
-        margin-top: 20px;
-        font-weight: bold;
-        color: #d6336c;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-    }
-    .instrucoes {
-        margin-top: 20px;
-        font-size: 0.9em;
-        color: #666;
-        max-width: 80%;
-    }
-  </style>
-</head>
-<body>
-  <h1>🎁 Sorteio de Presentes</h1>
-  <button id="btnSortear">Sortear um presente</button>
-  <div id="resultado"></div>
-  
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getFirestore, doc, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-
-    // ----- Configuração do Firebase -----
-    const firebaseConfig = {
-      apiKey: "AIzaSyCZzmLT9o2iB2hLxC_K9q2DyDhkaBG1qH4",
-      authDomain: "cha-de-cozinha-40ac5.firebaseapp.com",
-      projectId: "cha-de-cozinha-40ac5",
-      storageBucket: "cha-de-cozinha-40ac5.firebasestorage.app",
-      messagingSenderId: "120302780416",
-      appId: "1:120302780416:web:383bcc8fc56f999eb598e5",
-      measurementId: "G-BREPECZX2M"
-    };
-    // ------------------------------------
-    
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const docRef = doc(db, "cha", "presentes");
-
-    const btnSortear = document.getElementById("btnSortear");
-    const resultadoEl = document.getElementById("resultado");
-
-    let sorteiosFeitos = parseInt(localStorage.getItem('sorteiosFeitos')) || 0;
-
-    function atualizarBotao() {
-      if (sorteiosFeitos === 1) {
-        btnSortear.textContent = 'Sortear +1 presente';
-      } else if (sorteiosFeitos >= 2) {
-        btnSortear.disabled = true;
-        btnSortear.textContent = 'Você já sorteou 2 presentes!';
-      } else {
-        btnSortear.textContent = 'Sortear um presente';
-      }
-    }
-
-    // Chama a função para ajustar o botão quando a página carrega
-    atualizarBotao();
-
-    async function sortearItem() {
-      return await runTransaction(db, async (t) => {
-        const s = await t.get(docRef);
-        if (!s.exists()) {
-          throw new Error("Documento não existe");
-        }
-        const lista = s.data().lista || [];
-        if (lista.length === 0) {
-          throw new Error("empty");
-        }
-        const idx = Math.floor(Math.random() * lista.length);
-        const escolhido = lista[idx];
-        
-        const novaLista = lista.filter((_, i) => i !== idx);
-        const sorteados = (s.data().sorteados || []).concat(escolhido.nome);
-        
-        t.update(docRef, { lista: novaLista, sorteados: sorteados });
-        return escolhido;
-      });
-    }
-
-    btnSortear.onclick = async () => {
-      btnSortear.disabled = true;
-      btnSortear.textContent = 'Sorteando...';
-      try {
-        const res = await sortearItem();
-        
-        resultadoEl.innerHTML = `
-          <img src="${res.fotoURL}" alt="${res.nome}" />
-          <span class="item-name">${res.nome}</span>
-          <p class="instrucoes">Caso você não consiga comparecer, por favor, avise alguém próximo da noiva para que este item possa ser sorteado novamente.</p>
-        `;
-        
-        sorteiosFeitos++;
-        localStorage.setItem('sorteiosFeitos', sorteiosFeitos);
-        
-      } catch (e) {
-        resultadoEl.innerHTML = "<span>Erro ou lista vazia.</span>";
-        console.error(e);
-      }
-      
-      btnSortear.disabled = false;
-      atualizarBotao();
-    };
-  </script>
-</body>
-</html>
