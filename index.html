@@ -100,6 +100,22 @@
     const btnSortear = document.getElementById("btnSortear");
     const resultadoEl = document.getElementById("resultado");
 
+    let sorteiosFeitos = parseInt(localStorage.getItem('sorteiosFeitos')) || 0;
+
+    function atualizarBotao() {
+      if (sorteiosFeitos === 1) {
+        btnSortear.textContent = 'Sortear +1 presente';
+      } else if (sorteiosFeitos >= 2) {
+        btnSortear.disabled = true;
+        btnSortear.textContent = 'Você já sorteou 2 presentes!';
+      } else {
+        btnSortear.textContent = 'Sortear um presente';
+      }
+    }
+
+    // Chama a função para ajustar o botão quando a página carrega
+    atualizarBotao();
+
     async function sortearItem() {
       return await runTransaction(db, async (t) => {
         const s = await t.get(docRef);
@@ -133,13 +149,16 @@
           <p class="instrucoes">Caso você não consiga comparecer, por favor, avise alguém próximo da noiva para que este item possa ser sorteado novamente.</p>
         `;
         
-        btnSortear.textContent = 'Sortear +1 presente';
-
+        sorteiosFeitos++;
+        localStorage.setItem('sorteiosFeitos', sorteiosFeitos);
+        
       } catch (e) {
         resultadoEl.innerHTML = "<span>Erro ou lista vazia.</span>";
         console.error(e);
       }
+      
       btnSortear.disabled = false;
+      atualizarBotao();
     };
   </script>
 </body>
