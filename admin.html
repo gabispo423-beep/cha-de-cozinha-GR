@@ -66,4 +66,224 @@
         border-left-color: #8B9A67; /* Cor do spinner */
         animation: spin 1s ease infinite;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(36
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="initials">G&R</div>
+  <div id="authDiv">
+    <h1>Login de Administrador</h1>
+    <p>Para gerenciar os presentes, faça login com uma conta do Firebase Auth.</p>
+    <div class="row">
+      <input type="email" id="emailInput" placeholder="Email" />
+      <input type="password" id="passwordInput" placeholder="Senha" />
+      <button id="btnLogin">Entrar</button>
+      <button id="btnLogout" style="display:none;">Sair</button>
+    </div>
+  </div>
+  
+  <div id="adminPanel" style="display:none;">
+    <h1>Gerenciar Presentes</h1>
+    
+    <div class="box">
+      <h2>Adicionar um item</h2>
+      <div class="row">
+        <input type="text" id="novoItem" placeholder="Nome do presente" />
+        <input type="url" id="novoItemUrl" placeholder="URL da foto" />
+        <button class="btn" id="btnAdd">Adicionar</button>
+      </div>
+    </div>
+    
+    <div class="box">
+      <h2>Adicionar vários itens (separados por linha)</h2>
+      <textarea id="bulkArea" placeholder="Nome do presente, URL da foto (um por linha)&#10;Ex: Liquidificador, https://url.com/liquidificador.jpg"></textarea>
+      <button class="btn" id="btnBulk">Adicionar todos</button>
+    </div>
+    
+    <div class="box">
+      <h2>Lista de Presentes Disponíveis</h2>
+      <div id="loading" class="spinner"></div>
+      <ul id="listaPresentes"></ul>
+    </div>
+    
+    <div class="box">
+      <h2>Presentes Sorteados (Histórico)</h2>
+      <ul id="listaSorteados"></ul>
+      <button class="btn btn-remove" id="btnLimpar">Limpar histórico</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCZzmLT9o2iB2hLxC_K9q2DyDhkaBG1qH4",
+      authDomain: "cha-de-cozinha-40ac5.firebaseapp.com",
+      projectId: "cha-de-cozinha-40ac5",
+      storageBucket: "cha-de-cozinha-40ac5.firebasestorage.app",
+      messagingSenderId: "120302780416",
+      appId: "1:120302780416:web:383bcc8fc56f999eb598e5",
+      measurementId: "G-BREPECZX2M"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const docRef = doc(db, "cha", "presentes");
+
+    const adminPanel = document.getElementById("adminPanel");
+    const authDiv = document.getElementById("authDiv");
+    const emailInput = document.getElementById("emailInput");
+    const passwordInput = document.getElementById("passwordInput");
+    const btnLogin = document.getElementById("btnLogin");
+    const btnLogout = document.getElementById("btnLogout");
+    const novoItem = document.getElementById("novoItem");
+    const novoItemUrl = document.getElementById("novoItemUrl");
+    const btnAdd = document.getElementById("btnAdd");
+    const bulkArea = document.getElementById("bulkArea");
+    const btnBulk = document.getElementById("btnBulk");
+    const listaPresentes = document.getElementById("listaPresentes");
+    const listaSorteados = document.getElementById("listaSorteados");
+    const btnLimpar = document.getElementById("btnLimpar");
+    const loading = document.getElementById("loading");
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        authDiv.style.display = "none";
+        adminPanel.style.display = "block";
+        btnLogout.style.display = "block";
+      } else {
+        authDiv.style.display = "block";
+        adminPanel.style.display = "none";
+        btnLogout.style.display = "none";
+      }
+    });
+
+    btnLogin.onclick = () => signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(e => alert(e.message));
+    btnLogout.onclick = () => signOut(auth);
+
+    onSnapshot(docRef, docSnap => {
+      loading.style.display = "none";
+      const data = docSnap.exists() ? docSnap.data() : { lista: [], sorteados: [] };
+      const lista = data.lista || [];
+      const sorteados = data.sorteados || [];
+      
+      listaPresentes.innerHTML = '';
+      if (lista.length === 0) {
+        listaPresentes.innerHTML = '<li>Nenhum item na lista.</li>';
+      }
+      lista.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="item-name">${item.nome}</span>
+          <div class="edit-inputs" style="display:none;">
+            <input type="text" value="${item.nome}" />
+            <input type="url" value="${item.fotoURL}" />
+          </div>
+          <div class="action-buttons">
+            <button class="btn btn-edit">Editar</button>
+            <button class="btn btn-remove">Remover</button>
+            <button class="btn">Marcar como sorteado</button>
+          </div>
+          <div class="edit-buttons" style="display:none;">
+            <button class="btn btn-save">Salvar</button>
+            <button class="btn btn-cancel">Cancelar</button>
+          </div>
+        `;
+        
+        const actionBtns = li.querySelector('.action-buttons');
+        const editBtns = li.querySelector('.edit-buttons');
+        const itemSpan = li.querySelector('.item-name');
+        const editInputs = li.querySelector('.edit-inputs');
+        const editNomeInput = editInputs.querySelector('input[type="text"]');
+        const editUrlInput = editInputs.querySelector('input[type="url"]');
+
+        li.querySelector('.btn-edit').onclick = () => {
+          actionBtns.style.display = 'none';
+          editBtns.style.display = 'flex';
+          itemSpan.style.display = 'none';
+          editInputs.style.display = 'flex';
+        };
+
+        li.querySelector('.btn-cancel').onclick = () => {
+          actionBtns.style.display = 'flex';
+          editBtns.style.display = 'none';
+          itemSpan.style.display = 'block';
+          editInputs.style.display = 'none';
+        };
+
+        li.querySelector('.btn-save').onclick = async () => {
+          const nome = editNomeInput.value.trim();
+          const fotoURL = editUrlInput.value.trim();
+          if (!nome || !fotoURL) return alert("Nome e URL não podem ser vazios.");
+          const novoObjeto = { nome, fotoURL };
+          try {
+            await updateDoc(docRef, { lista: arrayRemove(item) });
+            await updateDoc(docRef, { lista: arrayUnion(novoObjeto) });
+          } catch(e){ alert("Erro ao salvar: "+e.message); }
+        };
+
+        li.querySelector('.btn-remove').onclick = async () => await updateDoc(docRef, { lista: arrayRemove(item) });
+        li.querySelector('.btn').onclick = async () => await updateDoc(docRef, { lista: arrayRemove(item), sorteados: arrayUnion(item.nome) });
+        
+        listaPresentes.appendChild(li);
+      });
+      
+      listaSorteados.innerHTML = '';
+      if (sorteados.length === 0) {
+        listaSorteados.innerHTML = '<li>Nenhum item sorteado ainda.</li>';
+      }
+      sorteados.forEach(nome => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${nome}</span>`;
+        listaSorteados.appendChild(li);
+      });
+    });
+
+    btnAdd.onclick = async () => {
+      const nome = novoItem.value.trim();
+      const fotoURL = novoItemUrl.value.trim();
+      if (!nome) return alert("Digite o nome do presente.");
+      if (!fotoURL) return alert("Digite a URL da foto.");
+      const novoObjeto = { nome, fotoURL };
+      try {
+        try {
+          await updateDoc(docRef, { lista: arrayUnion(novoObjeto) });
+        } catch (err) {
+          await setDoc(docRef, { lista: [novoObjeto], sorteados: [] });
+        }
+        novoItem.value = "";
+        novoItemUrl.value = "";
+      } catch(e){ alert("Erro: "+e.message); }
+    };
+
+    btnBulk.onclick = async () => {
+      const lines = bulkArea.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      if (lines.length === 0) return alert("Digite pelo menos um item.");
+      const novosItens = lines.map(line => {
+        const [nome, fotoURL] = line.split(',').map(s=>s.trim());
+        if (!nome || !fotoURL) throw new Error("Formato inválido: 'Nome do item, URL da foto'.");
+        return { nome, fotoURL };
+      });
+      
+      try {
+        try {
+          await updateDoc(docRef, { lista: arrayUnion(...novosItens) });
+        } catch (err) {
+          await setDoc(docRef, { lista: novosItens, sorteados: [] });
+        }
+        bulkArea.value = "";
+      } catch(e){ alert("Erro: " + e.message); }
+    };
+
+    btnLimpar.onclick = async () => {
+      if (!confirm("Tem certeza que deseja limpar todo o histórico de sorteios?")) return;
+      try {
+        await updateDoc(docRef, { sorteados: [] });
+      } catch(e){ alert("Erro: "+e.message); }
+    };
+  </script>
+</body>
+</html>
